@@ -58,22 +58,22 @@ Set up authentication using your service account key file:
 
 **Windows (PowerShell):**
 ```powershell
-$env:GOOGLE_APPLICATION_CREDENTIALS="$PWD\secret\emerald-skill-352503-dbt.json"
+$env:GOOGLE_APPLICATION_CREDENTIALS="$PWD\secret\secret.json"
 ```
 
 **Windows (Command Prompt):**
 ```cmd
-set GOOGLE_APPLICATION_CREDENTIALS=%CD%\secret\emerald-skill-352503-dbt.json
+set GOOGLE_APPLICATION_CREDENTIALS=%CD%\secret\secret.json
 ```
 
 **Linux/Mac:**
 ```bash
-export GOOGLE_APPLICATION_CREDENTIALS="$PWD/secret/emerald-skill-352503-dbt.json"
+export GOOGLE_APPLICATION_CREDENTIALS="$PWD/secret/secret.json"
 ```
 
 **Or add to your `.env` file (recommended):**
 ```env
-GOOGLE_APPLICATION_CREDENTIALS=./secret/emerald-skill-352503-dbt.json
+GOOGLE_APPLICATION_CREDENTIALS=./secret/secret.json
 ```
 
 Your service account needs these permissions:
@@ -85,17 +85,17 @@ Your service account needs these permissions:
 
 ```bash
 # Create the secret (one time)
-gcloud secrets create invezgo-api-token --project=emerald-skill-352503
+gcloud secrets create $SECRET_NAME --project=$PROJECT_ID
 
 # Add the token value
-echo -n "YOUR_INVEZGO_TOKEN" | gcloud secrets versions add invezgo-api-token --data-file=-
+echo -n "YOUR_INVEZGO_TOKEN" | gcloud secrets versions add $SECRET_NAME --data-file=-
 ```
 
 ### 4. Create BigQuery Dataset and Table
 
 ```bash
 # Create dataset
-bq mk --dataset emerald-skill-352503:invezgo_data
+bq mk --dataset $PROJECT_ID:invezgo_data
 
 # The table will be created automatically on first run with auto-detected schema
 # Or you can create it manually with a specific schema
@@ -158,8 +158,8 @@ copy config\.env.example .env
 Edit `.env` in the root directory with your configuration:
 
 ```env
-GCP_PROJECT_ID=emerald-skill-352503
-SECRET_NAME=invezgo-api-token
+GCP_PROJECT_ID=$PROJECT_ID
+SECRET_NAME=$SECRET_NAME
 SECRET_VERSION=latest
 
 INVEZGO_API_BASE_URL=https://api.invezgo.com/
@@ -183,7 +183,7 @@ The project includes utility scripts for easy setup:
 python scripts\verify_setup.py
 
 # 2. Setup GCP Secret (if needed)
-python scripts\setup_secret.py --token YOUR_INVEZGO_TOKEN
+python scripts\setup_secret.py --token INVEZGO_TOKEN
 
 # 3. Setup BigQuery (if needed)
 python scripts\setup_bigquery.py
@@ -292,7 +292,7 @@ playground/
 │   └── pipeline.log
 │
 └── secret/                      # GCP service account keys
-    └── emerald-skill-352503-dbt.json
+    └── secret.json
 ```
 
 ## Configuration
@@ -301,12 +301,12 @@ playground/
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `GCP_PROJECT_ID` | GCP project ID | `emerald-skill-352503` |
-| `SECRET_NAME` | Secret name in Secret Manager | `invezgo-api-token` |
+| `GCP_PROJECT_ID` | GCP project ID | `$PROJECT$` |
+| `SECRET_NAME` | Secret name in Secret Manager | `$SECRET_NAME` |
 | `SECRET_VERSION` | Secret version | `latest` |
 | `INVEZGO_API_BASE_URL` | Invezgo API base URL | `https://api.invezgo.com/` |
 | `BQ_DATASET_ID` | BigQuery dataset ID | `invezgo_data` |
-| `BQ_LOCATION` | BigQuery dataset location | `US` |
+| `BQ_LOCATION` | BigQuery dataset location | `$REGION` |
 | `LOG_LEVEL` | Logging level | `INFO` |
 
 ### Endpoints Configuration (config/endpoints.yaml)
@@ -721,26 +721,3 @@ crontab -e
 # Run daily at 2 AM
 0 2 * * * cd /path/to/playground && /path/to/python main.py >> pipeline.log 2>&1
 ```
-
-## Troubleshooting
-
-### Permission Denied Error
-
-Ensure your service account has the required roles:
-```bash
-gcloud projects add-iam-policy-binding emerald-skill-352503 \
-  --member="serviceAccount:YOUR_SERVICE_ACCOUNT@emerald-skill-352503.iam.gserviceaccount.com" \
-  --role="roles/secretmanager.secretAccessor"
-```
-
-### API Authentication Error
-
-Verify your token in Secret Manager is correct and not expired.
-
-### BigQuery Schema Mismatch
-
-If the auto-detected schema doesn't match your needs, create the table manually with a custom schema before running the pipeline.
-
-## License
-
-MIT
