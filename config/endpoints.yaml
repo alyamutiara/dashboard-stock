@@ -29,50 +29,27 @@ endpoints:
     enabled: true
 
   # === BATCH ENDPOINTS ===
-  # These endpoints run periodically with different parameters
-  
-  # Broker summary per stock (batch processing)
   - name: broker_summary_stock
     path: /analysis/summary/stock/{stock_code}
     description: "Broker summary for a specific stock with daily data"
     bq_table: broker_summary_stock
     execution_mode: batch
     batch_config:
-      # Define how to iterate through batches
       iterate_by: stock_code  # Which parameter to iterate
       source_table: syariah_stock_list  # Get JII70 stocks from this table
       source_column: kode  # Column containing stock codes
       source_filter: "indeks = 'JII70'"  # SQL WHERE clause to filter stocks
       # values: ["BBCA", "BBRI", "BMRI"]  # Or use static list (commented out)
-      
-      # Date iteration for daily processing
-      # IMPORTANT: Date ranges are split into individual days
-      # Example: --start-date 2025-10-20 --end-date 2025-10-24
-      #   = 5 separate API calls (one per day)
-      #   NOT: from=2025-10-20&to=2025-10-24 (would give averaged data)
-      #   BUT: from=2025-10-20&to=2025-10-20 (daily data)
-      #        from=2025-10-21&to=2025-10-21 (daily data)
-      #        ... etc for each day
-      #
-      # Note: Dates are overridden by command-line arguments (--date, --start-date/--end-date)
-      # If no arguments provided, uses today's date in Jakarta timezone
       date_iteration:
         enabled: true
         start_date: "auto"  # Will be overridden by CLI or auto-detected (today in Jakarta TZ)
         end_date: "auto"    # Will be overridden by CLI or auto-detected (today in Jakarta TZ)
         date_column: date   # Column name to store the date in result
-    
-    # Partition configuration for idempotent writes
-    # Note: Only partition by date (not stock_code) to batch BigQuery operations
-    # This prevents rate limit errors when processing many stocks for the same date
     partition_key:
       - date  # Partition by date only (deletes all stocks for this date, then inserts)
-    
-    # Additional columns to inject into each record
     inject_columns:
       stock_code: "{stock_code}"  # Will be replaced with current iteration value
       date: "{date}"              # Will be replaced with current date value
-    
     params:
       from: "{date}"      # Will be replaced with current date
       to: "{date}"        # Same date for single day
@@ -80,7 +57,27 @@ endpoints:
       market: "RG"
     path_variables:
       stock_code: null    # Will be replaced during batch iteration
-    enabled: true         # Set to true when ready to use
+    enabled: false         # Set to true when ready to use
+
+  - name: intraday_stock_chart
+    path: /analysis/intraday/{stock_code}
+    description: "Intraday stock chart data for a specific stock"
+    bq_table: intraday_stock_chart
+    execution_mode: batch
+    batch_config:
+      iterate_by: stock_code
+      source_table: syariah_stock_list
+      source_column: kode
+      source_filter: "indeks = 'JII70'"
+    partition_key: []  # Empty - always append, no partition replacement
+    inject_columns:
+      stock_code: "{stock_code}"
+    params:
+      market: "RG"
+    path_variables:
+      stock_code: null
+    enabled: true
+
 
   # === STREAMING ENDPOINTS ===
   # These endpoints are for real-time or near-real-time data

@@ -230,12 +230,22 @@ class BatchMode(ExecutionMode):
                         {iterate_by: None, 'date': date_value}  # Only date partition, not stock_code
                     )
                     
-                    # Single delete + insert operation for all stocks on this date
+                    # Determine write disposition based on whether partition keys are configured
+                    if partition_fields:
+                        # Has partition keys (e.g., date) - use partition replacement for idempotency
+                        write_disposition = 'WRITE_TRUNCATE_PARTITION'
+                        logger.info(f"[BATCH] Using partition replacement (idempotent) for partition: {partition_fields}")
+                    else:
+                        # No partition keys - always append (no replacement)
+                        write_disposition = 'WRITE_APPEND'
+                        logger.info(f"[BATCH] Using append mode (no partition replacement)")
+                    
+                    # Single delete + insert operation for all stocks on this date (or append if no partition)
                     rows = self.bq_loader.load_data(
                         self.dataset_id,
                         bq_table,
                         date_data,
-                        write_disposition='WRITE_TRUNCATE_PARTITION',
+                        write_disposition=write_disposition,
                         partition_fields=partition_fields
                     )
                     total_records += rows

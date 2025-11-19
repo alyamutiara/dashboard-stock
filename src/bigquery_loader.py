@@ -42,7 +42,7 @@ class BigQueryLoader:
         for record in data:
             # Create new ordered dict with original fields first
             new_record = {k: v for k, v in record.items() if not k.startswith('_sys_')}
-            # Add system columns at the end
+            # Add system columns at the end (using Jakarta timezone)
             new_record['_sys_ingested_at'] = timestamp_str
             result.append(new_record)
         
@@ -120,19 +120,44 @@ class BigQueryLoader:
         """
         try:
             table_ref = f"{self.project_id}.{dataset_id}.{table_id}"
-            
+
             # Add system columns to data
             data_with_system_cols = self._add_system_columns(data)
-            
-            # If partition replacement is requested, delete existing partition first
-            if partition_fields and write_disposition == 'WRITE_TRUNCATE_PARTITION':
-                self._delete_partition(dataset_id, table_id, partition_fields)
-                # Change to WRITE_APPEND after deletion
-                write_disposition = 'WRITE_APPEND'
-            
+
+            # Normalize and handle write disposition
+            normalized_disposition = write_disposition
+
+            # Special handling for custom partition truncate mode
+            if isinstance(normalized_disposition, str) and normalized_disposition.upper() == 'WRITE_TRUNCATE_PARTITION':
+                if partition_fields:
+                    # Delete existing rows for the target partition keys, then append
+                    self._delete_partition(dataset_id, table_id, partition_fields)
+                    normalized_disposition = 'WRITE_APPEND'
+                else:
+                    # No partition provided; avoid truncating entire table unexpectedly
+                    logger.warning(
+                        "WRITE_TRUNCATE_PARTITION requested without partition_fields; falling back to WRITE_APPEND"
+                    )
+                    normalized_disposition = 'WRITE_APPEND'
+
+            # Map to a valid BigQuery WriteDisposition enum
+            if isinstance(normalized_disposition, str):
+                try:
+                    bq_write_disposition = getattr(
+                        bigquery.WriteDisposition, normalized_disposition
+                    )
+                except AttributeError:
+                    raise ValueError(
+                        f"Invalid write_disposition: {write_disposition}. "
+                        "Use one of: WRITE_APPEND, WRITE_TRUNCATE, WRITE_EMPTY, or the special WRITE_TRUNCATE_PARTITION with partition_fields."
+                    )
+            else:
+                # Assume caller passed an enum value already
+                bq_write_disposition = normalized_disposition
+
             # Configure load job
             job_config = bigquery.LoadJobConfig(
-                write_disposition=getattr(bigquery.WriteDisposition, write_disposition),
+                write_disposition=bq_write_disposition,
                 source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
                 autodetect=True,  # Auto-detect schema from JSON
             )
