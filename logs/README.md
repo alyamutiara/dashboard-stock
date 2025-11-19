@@ -160,19 +160,3 @@ grep "Error loading data to BigQuery" logs/pipeline.log
 # Check for partition deletion errors
 grep "Error deleting partition" logs/batch.log
 ```
-
-## Best Practices
-
-1. **Regular cleanup**: Don't let logs grow indefinitely
-2. **Monitor disk space**: Large backfills can generate large logs
-3. **Use mode-specific logs**: Easier to trace issues
-4. **Archive important runs**: Keep logs from critical backfills
-5. **Check logs after runs**: Verify success before scheduling
-
-## Log Retention Recommendations
-
-- **Development**: Keep 7 days
-- **Production (scheduled)**: Keep 30 days
-- **Production (backfill)**: Archive permanently
-- **Pipeline.log**: Keep longest (30-90 days)
-- **Mode-specific logs**: Keep shorter (7-30 days)
