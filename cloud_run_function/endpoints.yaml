@@ -1,0 +1,95 @@
+# API Endpoints Configuration
+# Define all Invezgo API endpoints to fetch data from
+#
+# Execution Modes:
+#   - onetime: Run once to fetch reference/lookup data (e.g., lists)
+#   - batch: Run periodically with different parameters (e.g., daily summaries)
+#   - streaming: Real-time or near-real-time data ingestion
+
+endpoints:
+  # === ONETIME ENDPOINTS ===
+  # These endpoints fetch reference data that changes infrequently
+  
+  # Stock list
+  - name: stock_list
+    path: /analysis/list/stock
+    description: "List of all available stocks"
+    bq_table: stock_list
+    execution_mode: onetime
+    params: {}
+    enabled: true
+
+  # Broker list
+  - name: broker_list
+    path: /analysis/list/broker
+    description: "List of all brokers"
+    bq_table: broker_list
+    execution_mode: onetime
+    params: {}
+    enabled: true
+
+  # === BATCH ENDPOINTS ===
+  - name: broker_summary_stock
+    path: /analysis/summary/stock/{stock_code}
+    description: "Broker summary for a specific stock with daily data"
+    bq_table: broker_summary_stock
+    execution_mode: batch
+    batch_config:
+      iterate_by: stock_code  # Which parameter to iterate
+      source_table: syariah_stock_list  # Get JII70 stocks from this table
+      source_column: kode  # Column containing stock codes
+      source_filter: "indeks = 'JII70'"  # SQL WHERE clause to filter stocks
+      # values: ["BBCA", "BBRI", "BMRI"]  # Or use static list (commented out)
+      date_iteration:
+        enabled: true
+        start_date: "auto"  # Will be overridden by CLI or auto-detected (today in Jakarta TZ)
+        end_date: "auto"    # Will be overridden by CLI or auto-detected (today in Jakarta TZ)
+        date_column: date   # Column name to store the date in result
+    partition_key:
+      - date  # Partition by date only (deletes all stocks for this date, then inserts)
+    inject_columns:
+      stock_code: "{stock_code}"  # Will be replaced with current iteration value
+      date: "{date}"              # Will be replaced with current date value
+    params:
+      from: "{date}"      # Will be replaced with current date
+      to: "{date}"        # Same date for single day
+      investor: "all"
+      market: "RG"
+    path_variables:
+      stock_code: null    # Will be replaced during batch iteration
+    enabled: false         # Set to true when ready to use
+
+  - name: intraday_stock_chart
+    path: /analysis/intraday/{stock_code}
+    description: "Intraday stock chart data for a specific stock"
+    bq_table: intraday_stock_chart
+    execution_mode: batch
+    batch_config:
+      iterate_by: stock_code
+      source_table: syariah_stock_list
+      source_column: kode
+      source_filter: "indeks = 'JII70'"
+    partition_key: []  # Empty - always append, no partition replacement
+    inject_columns:
+      stock_code: "{stock_code}"
+    params:
+      market: "RG"
+    path_variables:
+      stock_code: null
+    enabled: true
+
+
+  # === STREAMING ENDPOINTS ===
+  # These endpoints are for real-time or near-real-time data
+  
+  # Example streaming endpoint (uncomment when ready)
+  # - name: realtime_trades
+  #   path: /streaming/trades
+  #   description: "Real-time trade data"
+  #   bq_table: realtime_trades
+  #   execution_mode: streaming
+  #   streaming_config:
+  #     poll_interval: 5  # seconds
+  #     max_records_per_poll: 100
+  #   params: {}
+  #   enabled: false
